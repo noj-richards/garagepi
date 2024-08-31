@@ -1,0 +1,6 @@
+github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1 h1:wG8n/XJQ07TmjbITcGiUaOtXxdrINDz1b0J1w0SzqDc=
+github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1/go.mod h1:A2S0CWkNylc2phvKXWBBdD3K0iGnDBGbzRpISP2zBl8=
+github.com/kmmndr/goPi v1.0.3 h1:5aWsc7feG3nG0FA/RMDJCa5eSKYEkbzvUzgfa2Nkn8M=
+github.com/kmmndr/goPi v1.0.3/go.mod h1:Ax1C4r0zW6BhUx6c/EErA3N2E9o5ZWJ8ay7VGqE9xRQ=
+google.golang.org/protobuf v1.34.2 h1:6xV6lTsCfpGD21XK49h7MhtcApnLqkfYgPcdHftf6hg=
+google.golang.org/protobuf v1.34.2/go.mod h1:qYOHts0dSfpeUzUFpOMr/WGzszTmLH+DiWniOlNbLDw=

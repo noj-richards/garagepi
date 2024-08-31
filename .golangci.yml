@@ -1,0 +1,95 @@
+issues: 
+  max-issues-per-linter: 0
+
+run:
+  timeout: 10m
+
+output:
+  formats:
+    - format: junit-xml
+      path: junit-report.xml
+    - format: colored-line-number
+      path: stdout
+ 
+linters:
+  disable-all: true
+  enable:
+    - depguard
+    - revive
+    - gosec
+    - staticcheck
+
+linters-settings:
+  depguard:
+    rules:
+      main:
+        deny:
+        - pkg: "io/ioutil"
+          desc: "Deprecated: As of Go 1.16, the same functionality is now provided by package [io] or package [os], and those implementations should be preferred in new code."
+  revive:
+    ignore-generated-header: false
+    severity : "warning"
+    confidence: 0.8
+    enable-all-rules : true
+    rules:      
+    - name: banned-characters 
+      disabled : true
+    - name:  file-header
+      disabled : true
+    - name:  cyclomatic
+      arguments :
+        - 30
+    - name:  argument-limit
+      arguments :
+        - 6
+    - name:  function-length
+      arguments :
+        - 80
+        - 0
+    - name:  max-public-structs
+      disabled : true
+    - name:  line-length-limit
+      disabled : true
+    - name:  cognitive-complexity
+      arguments :
+        - 20
+    - name:  function-result-limit
+      arguments :
+        - 3
+    - name: unhandled-error
+      arguments:
+        - fmt.Println
+        - fmt.Printf
+        - fmt.Print
+        - fmt.Fprintln
+        - fmt.Fprintf
+        - fmt.Fprint
+    - name:  add-constant
+      disabled : true
+    - name:  exported
+      disabled : true
+    - name:  use-any
+      disabled : true
+    - name:  package-comments
+      disabled : true
+    - name:  unused-receiver
+      disabled : true
+    - name:  unused-parameter
+      disabled : true
+    - name:  empty-lines
+      disabled : true
+    - name:  var-naming
+      disabled : true
+    - name:  flag-parameter
+      disabled : true
+    - name:  comment-spacings
+      disabled : true
+    - name: unchecked-type-assertion
+      arguments:
+        - acceptIgnoredAssertionResult: true
+  gosec:
+    excludes:
+      - G404
+
+    
+    

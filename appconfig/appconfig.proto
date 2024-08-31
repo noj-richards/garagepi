@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+// Define the package name (optional but recommended)
+package appconfig;
+option go_package = "github.com/noj-richards/garagepi/appconfig";
+
+// AppConfig used to configure the garage pi application
+message AppConfig {
+  // The telegram bot token
+  string telegram_bot_token = 1;
+  // group_channel_id if non zero the events and errors will
+  // additionally be sent to this channel
+  int64 group_channel_id = 2;
+  // allow_list_ids as a repeated list of integers
+  repeated int64 allow_list_ids = 3;
+  // door_relay_number the relay on the PiFACE used to open the door
+  int32 door_relay_number = 4;
+  // door_input_number the input on the PiFACE used to detect the door state
+  int32 door_input_number = 5;
+}
