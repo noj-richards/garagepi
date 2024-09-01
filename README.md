@@ -4,4 +4,4 @@ A reed switch on the door is connected through to one of the inputs on the PiFAC
 
 The Telegram BOT can be used with a group so everyone is notified if the door is opened.
 
-I recommend servo.net to expose the webhooks to the internet. It is then possible to create REST shortcuts on a phone to control the app from the homescreen or using Siri.
+I recommend serveo.net to expose the webhooks to the internet. It is then possible to create REST shortcuts on a phone to control the app from the homescreen or using Siri.
