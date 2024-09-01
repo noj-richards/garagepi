@@ -5,12 +5,15 @@ GOOS=linux GOARCH=arm GOARM=6 go build main.go
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"garagepi/appconfig"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/kmmndr/goPi/piface"
@@ -19,6 +22,8 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+var videoInProgress atomic.Bool
 
 func (p *realPi) init() error {
 	p.pfd = piface.NewPiFaceDigital(spi.DEFAULT_HARDWARE_ADDR, spi.DEFAULT_BUS, spi.DEFAULT_CHIP)
@@ -94,7 +99,93 @@ func processMessage(config *appconfig.AppConfig, message string, id int64, p pi,
 		}
 		return sendPic(id, bot)
 	}
+	if strings.ToLower(message) == "video" {
+		go recordAndSendVideo(id, bot)
+	}
 	return nil
+}
+
+func sendPic(id int64, bot *tgbotapi.BotAPI) error {
+	filePath := "snap.jpg"
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Create a new photo upload request
+	photo := tgbotapi.NewPhoto(id, tgbotapi.FileReader{
+		Name:   filePath,
+		Reader: file,
+	})
+	// Send the photo
+	_, err = bot.Send(photo)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func sendVideo(id int64, bot *tgbotapi.BotAPI) error {
+	filePath := "video2.mp4"
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Create a new photo upload request
+	video := tgbotapi.NewInputMediaVideo(tgbotapi.FileReader{
+		Name:   filePath,
+		Reader: file,
+	})
+
+	mediaGroup := tgbotapi.NewMediaGroup(id, []interface{}{video})
+
+	// Send the video
+	// Send the media group using the bot.Request method
+	response, err := bot.Request(mediaGroup)
+	if err != nil {
+		return err
+	}
+
+	// Handle the response
+	var messages []tgbotapi.Message
+	if err := json.Unmarshal(response.Result, &messages); err != nil {
+		return err
+	}
+	for _, msg := range messages {
+		log.Printf("Message ID: %d\n", msg.MessageID)
+	}
+	return nil
+}
+
+func recordAndSendVideo(id int64, bot *tgbotapi.BotAPI) {
+	if !videoInProgress.CompareAndSwap(false, true) {
+		bot.Send(tgbotapi.NewMessage(id, "Video capture already in progress, can't start another"))
+		return
+	}
+
+	defer videoInProgress.Store(false)
+
+	bot.Send(tgbotapi.NewMessage(id, "Video capture started..."))
+	if err := os.Remove("video2.h264"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logToGroup(id, bot, fmt.Sprintf("Error removing source file %v", err.Error()))
+	}
+	if err := os.Remove("video2.mp4"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logToGroup(id, bot, fmt.Sprintf("Error removing converted file %v", err.Error()))
+	}
+	if err := exec.Command("raspivid", "-hf", "-vf", "-w", "640", "-h", "480", "-o", "video2.h264", "-t", "30000").Run(); err != nil {
+		logToGroup(id, bot, fmt.Sprintf("Error calling raspivid %v", err.Error()))
+		return
+	}
+	if err := exec.Command("ffmpeg", "-i", "video2.h264", "-vcodec", "copy", "video2.mp4").Run(); err != nil {
+		logToGroup(id, bot, fmt.Sprintf("Error calling ffmpeg %v", err.Error()))
+		return
+	}
+	if err := sendVideo(id, bot); err != nil {
+		logToGroup(id, bot, fmt.Sprintf("Error sending video %v", err.Error()))
+	}
 }
 
 func status(config *appconfig.AppConfig, p pi, id int64, bot *tgbotapi.BotAPI) {
@@ -141,7 +232,7 @@ func toggleDoor(config *appconfig.AppConfig, p pi, id int64, bot *tgbotapi.BotAP
 	if id != config.GroupChannelId && config.GroupChannelId != 0 {
 		bot.Send(tgbotapi.NewMessage(config.GroupChannelId, "The door is opening or closing"))
 	}
-	takeDelayedPic(id, config.GroupChannelId, p, bot)
+	go recordAndSendVideo(id, bot)
 	return nil
 }
 
@@ -182,27 +273,6 @@ func takeDelayedPic(id int64, groupChannelD int64, p pi, bot *tgbotapi.BotAPI) {
 			}
 		}
 	}()
-}
-
-func sendPic(id int64, bot *tgbotapi.BotAPI) error {
-	filePath := "snap.jpg"
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Create a new photo upload request
-	photo := tgbotapi.NewPhoto(id, tgbotapi.FileReader{
-		Name:   filePath,
-		Reader: file,
-	})
-	// Send the photo
-	_, err = bot.Send(photo)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func loadConfig(filename string) (*appconfig.AppConfig, error) {
