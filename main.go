@@ -352,10 +352,19 @@ func (s *serverConfig) webhookHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverConfig) startServer() {
+	log.Println("Server listening on port 8080")
+	server := &http.Server{
+		Addr:              ":8080",
+		Handler:           http.DefaultServeMux, // Or your custom handler
+		ReadTimeout:       10 * time.Second,     // Maximum duration for reading the entire request, including the body
+		WriteTimeout:      10 * time.Second,     // Maximum duration before timing out writes of the response
+		IdleTimeout:       60 * time.Second,     // Maximum amount of time to wait for the next request when keep-alives are enabled
+		ReadHeaderTimeout: 5 * time.Second,      // Maximum time to read request headers
+	}
 	http.HandleFunc("/webhook", s.webhookHandler)
-	fmt.Println("Server listening on port 8080")
+
 	go func() {
-		if err := http.ListenAndServe(":8080", nil); err != nil {
+		if err := server.ListenAndServe(); err != nil {
 			log.Printf("Failed to start server: %v", err)
 		}
 	}()
