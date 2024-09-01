@@ -17,4 +17,6 @@ message AppConfig {
   int32 door_relay_number = 4;
   // door_input_number the input on the PiFACE used to detect the door state
   int32 door_input_number = 5;
+  // auth token for webhook
+  string webhook_auth_token = 6;
 }

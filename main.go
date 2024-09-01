@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"garagepi/appconfig"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -76,6 +78,10 @@ func (p *fakepi) isOpen(inputNumber int) (bool, error) {
 	return true, nil
 }
 
+func (p *fakepi) takePic() error {
+	return nil
+}
+
 type realPi struct {
 	pfd *piface.PiFaceDigital
 }
@@ -94,15 +100,19 @@ func processMessage(config *appconfig.AppConfig, message string, id int64, p pi,
 		return closeDoor(config, p, id, bot)
 	}
 	if strings.ToLower(message) == "pic" {
-		if err := p.takePic(); err != nil {
-			return err
-		}
-		return sendPic(id, bot)
+		return takeAndSendPic(id, p, bot)
 	}
 	if strings.ToLower(message) == "video" {
 		go recordAndSendVideo(id, bot)
 	}
 	return nil
+}
+
+func takeAndSendPic(id int64, p pi, bot *tgbotapi.BotAPI) error {
+	if err := p.takePic(); err != nil {
+		return err
+	}
+	return sendPic(id, bot)
 }
 
 func sendPic(id int64, bot *tgbotapi.BotAPI) error {
@@ -307,14 +317,61 @@ func logToGroup(groupChannelId int64, bot *tgbotapi.BotAPI, logmsg string) {
 	bot.Send(msg)
 }
 
+type serverConfig struct {
+	config *appconfig.AppConfig
+	bot    *tgbotapi.BotAPI
+	p      pi
+}
+
+func (s *serverConfig) webhookHandler(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("auth")
+	if query != s.config.WebhookAuthToken {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	query = r.URL.Query().Get("cmd")
+	if query == "toggle" {
+		err := toggleDoor(s.config, s.p, s.config.GroupChannelId, s.bot)
+		if err != nil {
+			logToGroup(s.config.GroupChannelId, s.bot, err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+	if query == "pic" {
+		err := takeAndSendPic(s.config.GroupChannelId, s.p, s.bot)
+		if err != nil {
+			logToGroup(s.config.GroupChannelId, s.bot, err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+}
+
+func (s *serverConfig) startServer() {
+	http.HandleFunc("/webhook", s.webhookHandler)
+	fmt.Println("Server listening on port 8080")
+	go func() {
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Printf("Failed to start server: %v", err)
+		}
+	}()
+}
+
 func main() {
 	config, err := loadConfig("config.txt")
 	if err != nil {
 		log.Panicf("Failed to load config: %v", err)
 	}
-
-	//p := &fakepi{}
-	p := &realPi{}
+	var p pi
+	if runtime.GOOS == "darwin" {
+		p = &fakepi{}
+	} else {
+		p = &realPi{}
+	}
 	if err := p.init(); err != nil {
 		log.Panicf("Failed to initialize Pi: %v", err)
 	}
@@ -327,6 +384,13 @@ func main() {
 
 	// Print bot info
 	log.Printf("Authorized on account %s", bot.Self.UserName)
+
+	sConfig := &serverConfig{
+		config: config,
+		bot:    bot,
+		p:      p,
+	}
+	sConfig.startServer()
 
 	// Set up a channel to receive updates from Telegram
 	u := tgbotapi.NewUpdate(0)
